@@ -343,7 +343,7 @@
                 numThreads: 4
             };
 
-            const response = await fetch('./models/model2_quantized_weights.onnx.gz');
+            const response = await fetch('./model2_quantized_weights.onnx.gz');
             const buffer = await response.arrayBuffer();
             const decompressed = pako.ungzip(new Uint8Array(buffer));
 
