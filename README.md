@@ -10,6 +10,10 @@ Model trained using data from [https://github.com/sizhuoli/TreeCountSegHeight](h
 
 Spring orthophoto from [https://dataforsyningen.dk](https://dataforsyningen.dk/data/981) (CC BY 4.0 license).
 
-## Example image
+## Example images
 
 ![](https://github.com/KennethTM/tree-browser/blob/main/example1.jpeg)
+
+![](https://github.com/KennethTM/tree-browser/blob/main/example2.jpeg)
+
+![](https://github.com/KennethTM/tree-browser/blob/main/example3.jpeg)
