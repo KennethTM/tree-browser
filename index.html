@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tree-browser</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+            background: #f4f6fa;
+        }
+        #map {
+            height: 100vh;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            box-shadow: 0 0 16px rgba(0,0,0,0.08);
+        }
+        .controls {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255,255,255,0.98);
+            padding: 12px 12px 12px 12px;
+            border-radius: 18px;
+            box-shadow: 0 6px 32px rgba(0,0,0,0.13);
+            z-index: 1002;
+            min-width: 200px;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 15px;
+        }
+        .controls label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+            color: #1a2a3a;
+            cursor: pointer;
+            user-select: none;
+        }
+        .toggle-container {
+            margin-bottom: 2px;
+        }
+        .toggle-button {
+            width: 100%;
+            background: #f4f8ff;
+            border: 1px solid #e0e6ef;
+            border-radius: 10px;
+            padding: 8px 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            color: #1a2a3a;
+            text-align: left;
+            font-size: 15px;
+            box-shadow: 0 2px 8px rgba(51,136,255,0.05);
+        }
+        .toggle-button.active {
+            background: linear-gradient(90deg, #3388ff 0%, #4f9cff 100%);
+            color: white;
+            border-color: #3388ff;
+        }
+        .toggle-status {
+            background: #ffeeee;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #e74c3c;
+            transition: all 0.3s ease;
+        }
+        .toggle-button.active .toggle-status {
+            background: rgba(255, 255, 255, 0.25);
+            color: #2ecc71;
+        }
+        .controls button {
+            background: linear-gradient(90deg, #3388ff 0%, #4f9cff 100%);
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            padding: 8px 18px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 8px;
+            box-shadow: 0 2px 8px rgba(51,136,255,0.08);
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        .controls button:hover {
+            background: linear-gradient(90deg, #2566c1 0%, #3388ff 100%);
+            box-shadow: 0 4px 16px rgba(51,136,255,0.13);
+        }
+        .controls strong {
+            color: #3388ff;
+        }
+        .controls #treeCount {
+            background: #f4f8ff;
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin-bottom: 0;
+            box-shadow: 0 1px 4px rgba(51,136,255,0.07);
+        }
+        .controls #treeCount div {
+            margin-bottom: 2px;
+        }
+        .controls #treeCountValue, .controls #areaValue, .controls #densityValue {
+            color: #1a2a3a;
+            font-weight: 600;
+        }
+        .controls .howto {
+            margin-top: 10px;
+            border-top: 1px solid #e0e6ef;
+            padding-top: 10px;
+            color: #6a7a8c;
+            font-size: 14px;
+        }
+        .controls .howto div {
+            margin-bottom: 2px;
+        }
+        .zoom-level {
+            position: absolute;
+            bottom: 24px;
+            left: 32px;
+            background: rgba(255,255,255,0.96);
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 15px;
+            color: #3388ff;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(51,136,255,0.08);
+            z-index: 1002;
+        }
+        .leaflet-draw {
+            z-index: 1003 !important;
+        }
+        .leaflet-draw-toolbar a {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
+        .leaflet-draw-toolbar-top {
+            margin-top: 0 !important;
+        }
+        .tree-count-popup .leaflet-popup-content-wrapper {
+            background-color: rgba(255, 255, 255, 0.97);
+            border-radius: 10px;
+            box-shadow: 0 3px 18px rgba(51,136,255,0.13);
+        }
+        .tree-count-popup .leaflet-popup-content {
+            margin: 16px;
+            font-size: 15px;
+            font-weight: 400;
+            color: #111;
+            line-height: 1.6;
+        }
+        .tree-count-popup .leaflet-popup-content strong {
+            display: inline;
+            padding: 0;
+            color: #111;
+            font-weight: 600;
+            margin-right: 4px;
+        }
+        .tree-count-popup .popup-value {
+            font-weight: 400;
+            color: #111;
+        }
+        @media (max-width: 600px) {
+            .controls {
+                right: 0;
+                left: 0;
+                top: unset;
+                bottom: 0;
+                border-radius: 0;
+                min-width: unset;
+                max-width: unset;
+                width: 100vw;
+                padding: 18px 8px 12px 8px;
+                font-size: 14px;
+            }
+            .zoom-level {
+                left: 8px;
+                bottom: 8px;
+                padding: 6px 10px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="controls">
+        <div style="font-weight: 700; color: #3388ff; margin-bottom: 6px; font-size: 18px;">Tree-browser</div>
+        <div style="margin-bottom: 12px; color: #4a5a6c; font-size: 14px;">
+            Afgrænsning af trækroner og optælling af træer med neuralt netværk - <i>og alt analyseres lokalt i din browser.</i><br><br>Start modellen og tegn polygoner for at analysere et område.
+        </div>
+
+        <div class="toggle-container">
+            <button id="toggleModel" class="toggle-button">
+                <span class="toggle-text">Start/stop model (klik)</span>
+                <div class="toggle-status">Off</div>
+            </button>
+        </div>
+
+        <!-- Hidden element for JavaScript functionality, never displayed -->
+        <div id="treeCount" style="display: none; position: absolute; visibility: hidden;">
+            <span id="treeCountValue">0</span>
+            <span id="areaValue">0 m²</span>
+            <span id="densityValue">0</span>
+        </div>
+
+        <div style="margin-top: 16px; margin-bottom: 16px; display: flex; gap: 8px;">
+            <button id="drawPolygonBtn">Tegn polygon</button>
+            <button id="clearPolygons" style="background: #e74c3c; background: linear-gradient(90deg, #e74c3c 0%, #ff7675 100%);">Slet polygon(er)</button>
+        </div>
+
+        <div style="margin-top: auto; color: #6a7a8c; font-size: 13px; text-align: left;">
+            App af Kenneth Thorø Martinsen <a href="mailto:kenneth2810@gmail.com" style="color: #3388ff; text-decoration: none;">(kenneth2810@gmail.com)</a>
+        </div>
+    </div>
+    <div class="zoom-level" id="zoomLevel">Zoom: 8</div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-geometryutil@0.10.1/src/leaflet.geometryutil.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script>
+        // Initialize the map
+        var map = L.map('map', {
+            zoomControl: true,
+            doubleClickZoom: true
+        }).setView([56.25, 10.75], 8);
+        
+        // Store heatmap data for loaded tiles
+        var tileHeatmapData = {};
+        var currentPolygon = null;
+        var drawnItems;
+        var drawControl;
+
+        // Update zoom level display
+        function updateZoomLevel() {
+            document.getElementById('zoomLevel').innerText = 'Zoom: ' + map.getZoom();
+        }
+
+        map.on('zoomend', updateZoomLevel);
+        
+        // Initialize draw toolbar when map is ready
+        map.whenReady(function() {
+            console.log("Map is ready, initializing draw controls");
+        });
+        
+        // Initialize Leaflet Draw controls
+        function initDrawControls() {
+            console.log("Initializing draw controls");
+            
+            // Create a new feature group for drawn items
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+            
+            // Configure draw control options
+            var drawOptions = {
+                position: 'topleft',
+                draw: {
+                    polyline: false,
+                    polygon: {
+                        allowIntersection: false,
+                        drawError: {
+                            color: '#e1e100',
+                            message: '<strong>Cannot draw that shape!</strong>'
+                        },
+                        shapeOptions: {
+                            color: '#3388ff',
+                            weight: 3
+                        },
+                        showArea: true
+                    },
+                    rectangle: false,
+                    circle: false,
+                    marker: false,
+                    circlemarker: false
+                },
+                edit: {
+                    featureGroup: drawnItems,
+                    remove: true
+                }
+            };
+            
+            // Create and add the draw control
+            drawControl = new L.Control.Draw(drawOptions);
+            map.addControl(drawControl);
+            
+            // Add click event to select polygons
+            drawnItems.on('click', function(e) {
+                const clickedLayer = e.layer;
+                if (clickedLayer instanceof L.Polygon) {
+                    // Set as current polygon
+                    currentPolygon = clickedLayer;
+                    updateTreeCount();
+                    
+                    // Highlight this polygon
+                    drawnItems.eachLayer(function(layer) {
+                        if (layer instanceof L.Polygon) {
+                            if (layer === clickedLayer) {
+                                layer.setStyle({ color: '#ff7800', weight: 4 });
+                            } else {
+                                layer.setStyle({ color: '#3388ff', weight: 3 });
+                            }
+                        }
+                    });
+                }
+            });
+            
+            // Log to confirm control was added
+            console.log("Draw control added", drawControl);
+        }
+        
+        // Initialize draw controls
+        initDrawControls();
+
+        // Load ONNX model
+        async function loadModel() {
+            try {
+            // Try first with optimization options
+            const options = {
+                executionProviders: ['wasm'],
+                graphOptimizationLevel: 'all',
+                executionMode: 'parallel',
+                enableCpuMemArena: true,
+                enableMemPattern: true,
+                numThreads: 4
+            };
+
+            const response = await fetch('./models/model2_quantized_weights.onnx.gz');
+            const buffer = await response.arrayBuffer();
+            const decompressed = pako.ungzip(new Uint8Array(buffer));
+
+            try {
+                return await ort.InferenceSession.create(decompressed.buffer, options);
+            } catch (optimizationError) {
+                console.warn('Failed with optimization options, trying without:', optimizationError);
+                // Fallback to basic options
+                return await ort.InferenceSession.create(decompressed.buffer);
+            }
+            } catch (error) {
+            console.error('Error loading model:', error);
+            throw error;
+            }
+        }
+
+        // Preprocess image to match model input
+        function preprocessImage(image) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(image, 0, 0, 256, 256);
+            const imageData = ctx.getImageData(0, 0, 256, 256);
+            const data = new Float32Array(1 * 3 * 256 * 256);
+            for (let i = 0; i < 256 * 256; i++) {
+                data[i] = imageData.data[i * 4];
+                data[i + 256 * 256] = imageData.data[i * 4 + 1];
+                data[i + 2 * 256 * 256] = imageData.data[i * 4 + 2];
+            }
+            return new ort.Tensor('float32', data, [1, 3, 256, 256]);
+        }
+
+        // Postprocess model output to create segmentation overlay
+        function postprocessOutput(output, coords) {
+            const outputDataHeatmap = output["1220"].cpuData;
+            const outputDataMask = output["output"].cpuData;
+            
+            // Store heatmap data for this tile
+            const tileKey = `${coords.z}:${coords.x}:${coords.y}`;
+            tileHeatmapData[tileKey] = {
+                data: Array.from(outputDataHeatmap),
+                coords: {...coords},
+                bounds: getTileBounds(coords)
+            };
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.createImageData(256, 256);
+            const ALPHA = 128;
+            const colors = {
+                0: [0, 0, 0, 0],           // Background (transparent)
+                1: [34, 139, 34, ALPHA],   // Skov (Forest Green),
+            };
+            for (let i = 0; i < 256 * 256; i++) {
+                const value = Number(outputDataMask[i]);
+                const color = colors[value] || [0, 0, 0, 0];
+                imageData.data[i * 4] = color[0];
+                imageData.data[i * 4 + 1] = color[1];
+                imageData.data[i * 4 + 2] = color[2];
+                imageData.data[i * 4 + 3] = color[3];
+            }
+            ctx.putImageData(imageData, 0, 0);
+            return canvas;
+        }
+        
+        // Calculate tile bounds based on coordinates
+        function getTileBounds(coords) {
+            const tileSize = 256;
+            const nw = map.unproject(L.point(coords.x * tileSize, coords.y * tileSize), coords.z);
+            const se = map.unproject(L.point((coords.x + 1) * tileSize, (coords.y + 1) * tileSize), coords.z);
+            return L.latLngBounds(nw, se);
+        }
+        
+        // Convert pixel coordinates to lat/lng
+        function tilePixelToLatLng(tileCoords, pixelX, pixelY) {
+            const tileSize = 256;
+            const point = L.point(
+                tileCoords.x * tileSize + pixelX,
+                tileCoords.y * tileSize + pixelY
+            );
+            return map.unproject(point, tileCoords.z);
+        }
+        
+        // Check if a point is inside a polygon
+        function isPointInPolygon(point, polygon) {
+            const latlngs = polygon.getLatLngs()[0];
+            let inside = false;
+            let xi, yi, xj, yj, intersect;
+            const x = point.lng;
+            const y = point.lat;
+            
+            for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
+                xi = latlngs[i].lng;
+                yi = latlngs[i].lat;
+                xj = latlngs[j].lng;
+                yj = latlngs[j].lat;
+                
+                intersect = ((yi > y) !== (yj > y)) && 
+                    (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            
+            return inside;
+        }
+        
+        // Calculate area of a polygon in square meters
+        function calculatePolygonArea(polygon) {
+            // Get the area in square meters
+            const area = L.GeometryUtil.geodesicArea(polygon.getLatLngs()[0]);
+            return area;
+        }
+        
+        // Format area in appropriate units (sq m, hectares, or sq km)
+        function formatArea(areaSqM) {
+            let unitArea;
+            let unit;
+            
+            if (areaSqM < 10000) {
+                // Less than a hectare, show in sq meters
+                unitArea = areaSqM;
+                unit = 'm²';
+            } else if (areaSqM < 1000000) {
+                // Less than a sq km, show in hectares
+                unitArea = areaSqM / 10000;
+                unit = 'ha';
+            } else {
+                // Show in sq kilometers
+                unitArea = areaSqM / 1000000;
+                unit = 'km²';
+            }
+            
+            // Format to 2 decimal places if needed
+            return unitArea < 10 ? 
+                `${unitArea.toFixed(2)} ${unit}` : 
+                `${Math.round(unitArea)} ${unit}`;
+        }
+        
+        // Calculate tree density in trees per hectare
+        function calculateTreeDensity(treeCount, areaSqM) {
+            // Convert area to hectares (1 hectare = 10,000 square meters)
+            const areaInHectares = areaSqM / 10000;
+            
+            // Avoid division by zero
+            if (areaInHectares === 0) return 0;
+            
+            // Calculate and round density to 1 decimal place
+            return Math.round((treeCount / areaInHectares) * 10) / 10;
+        }
+
+        // Calculate sum of heatmap values inside polygon and tree cover percentage
+        function calculateTreeCount(polygon) {
+            let sum = 0;
+            let totalPixelsInPolygon = 0;
+            let treePixelsInPolygon = 0;
+            
+            // Iterate over all stored tile data
+            Object.values(tileHeatmapData).forEach(tile => {
+                // Check if the polygon intersects with this tile
+                if (polygon.getBounds().intersects(tile.bounds)) {
+                    // For each pixel in the heatmap
+                    for (let pixelY = 0; pixelY < 256; pixelY++) {
+                        for (let pixelX = 0; pixelX < 256; pixelX++) {
+                            // Convert pixel to lat/lng
+                            const pixelLatLng = tilePixelToLatLng(tile.coords, pixelX, pixelY);
+                            
+                            // Check if the point is inside the polygon
+                            if (isPointInPolygon(pixelLatLng, polygon)) {
+                                const pixelIndex = pixelY * 256 + pixelX;
+                                sum += tile.data[pixelIndex];
+                                
+                                // Count total pixels in polygon
+                                totalPixelsInPolygon++;
+                                
+                                // Count pixels with trees (non-zero values)
+                                if (tile.data[pixelIndex] > 0) {
+                                    treePixelsInPolygon++;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Calculate tree cover percentage
+            const treeCoverPercentage = totalPixelsInPolygon > 0 
+                ? Math.round((treePixelsInPolygon / totalPixelsInPolygon) * 100) 
+                : 0;
+                
+            return {
+                treeCount: Math.round(sum),
+                treeCoverPercentage: treeCoverPercentage
+            };
+        }
+
+        // Custom tile layer class
+        var CustomWMTSLayer = L.TileLayer.extend({
+            initialize: function (url, options) {
+                L.TileLayer.prototype.initialize.call(this, url, options);
+                this._timestamp = new Date().getTime();
+                this._modelSession = null;
+                loadModel().then(session => {
+                    this._modelSession = session;
+                });
+            },
+            createTile: function (coords, done) {
+                var canvas = L.DomUtil.create('canvas', 'leaflet-tile');
+                canvas.width = this.options.tileSize;
+                canvas.height = this.options.tileSize;
+                var ctx = canvas.getContext('2d');
+                
+                var tileImg = new Image();
+                tileImg.crossOrigin = 'anonymous';
+                tileImg.onload = async () => {
+                    ctx.drawImage(tileImg, 0, 0);
+                    const MIN_ZOOM_VAR = 16;
+                    if (this._modelSession && modelActive && map.getZoom() >= MIN_ZOOM_VAR) {
+                        const inputTensor = preprocessImage(tileImg);
+                        const output = await this._modelSession.run({ input: inputTensor});
+                        const overlayCanvas = postprocessOutput(output, coords);
+                        ctx.drawImage(overlayCanvas, 0, 0, canvas.width, canvas.height);
+                        
+                        // If there are polygons, update their tree counts
+                        if (drawnItems && drawnItems.getLayers().length > 0) {
+                            drawnItems.eachLayer(function(layer) {
+                                if (layer instanceof L.Polygon) {
+                                    // Update this polygon's tree count and cover
+                                    const { treeCount, treeCoverPercentage } = calculateTreeCount(layer);
+                                    layer.treeCount = treeCount;
+                                    
+                                    // Get or calculate area
+                                    const areaSqM = layer.areaSqM || calculatePolygonArea(layer);
+                                    const formattedArea = formatArea(areaSqM);
+                                    
+                                    // Calculate density
+                                    const density = calculateTreeDensity(treeCount, areaSqM);
+                                    
+                                    // Store data if not already stored
+                                    if (!layer.areaSqM) {
+                                        layer.areaSqM = areaSqM;
+                                    }
+                                    
+                                    // Store updated values
+                                    layer.treeCount = treeCount;
+                                    layer.density = density;
+                                    layer.treeCoverPercentage = treeCoverPercentage;
+                                    
+                                    // Update popup content
+                                    if (layer.getPopup()) {
+                                        layer.setPopupContent(`
+                                            <strong>Træer:</strong> <span class="popup-value">${treeCount}</span><br>
+                                            <strong>Areal:</strong> <span class="popup-value">${formattedArea}</span><br>
+                                            <strong>Tæthed:</strong> <span class="popup-value">${density} træer/ha</span><br>
+                                            <strong>Kronedække:</strong> <span class="popup-value">${treeCoverPercentage}%</span>
+                                        `);
+                                    } else {
+                                        layer.bindPopup(`
+                                            <strong>Træer:</strong> <span class="popup-value">${treeCount}</span><br>
+                                            <strong>Areal:</strong> <span class="popup-value">${formattedArea}</span><br>
+                                            <strong>Tæthed:</strong> <span class="popup-value">${density} træer/ha</span><br>
+                                            <strong>Kronedække:</strong> <span class="popup-value">${treeCoverPercentage}%</span>
+                                        `, {
+                                            className: 'tree-count-popup',
+                                            closeButton: true,
+                                            autoClose: false
+                                        });
+                                    }
+                                    
+                                    // Store the values in the hidden elements for future reference
+                                    if (layer === currentPolygon) {
+                                        document.getElementById('treeCountValue').textContent = treeCount;
+                                        document.getElementById('areaValue').textContent = formattedArea;
+                                        document.getElementById('densityValue').textContent = density;
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    done(null, canvas);
+                };
+
+                tileImg.src = this.getTileUrl(coords) + '&t=' + this._timestamp;
+                return canvas;
+            }
+        });
+
+        // Get all base layers (not including drawnItems)
+        const baseLayers = [];
+        map.eachLayer((layer) => {
+            baseLayers.push(layer);
+        });
+        
+        // Remove base layers but keep any UI elements
+        baseLayers.forEach(layer => {
+            if (layer !== drawnItems) {
+                map.removeLayer(layer);
+            }
+        });
+
+        // Create and add new layer
+        //webm version is EPSG:3857
+        var wmtsUrl = 'https://services.datafordeler.dk:443/GeoDanmarkOrto/orto_foraar_webm/1.0.0/WMTS/orto_foraar_webm/default/DFD_GoogleMapsCompatible/{z}/{y}/{x}.jpg?username=BJSIGPGRVW&password=Panseryrtat*56klinge';
+        
+        var layer = new CustomWMTSLayer(wmtsUrl, {
+            tileSize: 256,
+            maxZoom: 19,
+            attribution: 'CC BY 4.0, GeoDanmark, Forårsbilleder Ortofoto, dataforsyningen.dk'
+        }).addTo(map);
+        
+        // Ensure the drawn items layer is on top
+        if (drawnItems && map.hasLayer(drawnItems)) {
+            map.removeLayer(drawnItems);
+            map.addLayer(drawnItems);
+        }
+
+        // Initial zoom level display
+        updateZoomLevel();
+        
+        // Function to update tree count based on current polygon
+        function updateTreeCount() {
+            if (currentPolygon) {
+                // Use stored count if available, otherwise calculate it
+                const count = currentPolygon.treeCount || calculateTreeCount(currentPolygon);
+                document.getElementById('treeCountValue').textContent = count;
+                
+                // Get or calculate area
+                const areaSqM = currentPolygon.areaSqM || calculatePolygonArea(currentPolygon);
+                const formattedArea = formatArea(areaSqM);
+                
+                // Calculate density (trees per hectare)
+                const density = calculateTreeDensity(count, areaSqM);
+                
+                // Update hidden control panel values (for data storage only)
+                document.getElementById('areaValue').textContent = formattedArea;
+                document.getElementById('densityValue').textContent = density;
+                
+                // Keep tree count panel hidden
+                document.getElementById('treeCount').style.display = 'none';
+                
+                // Update stored values if necessary
+                if (!currentPolygon.treeCount) {
+                    currentPolygon.treeCount = count;
+                }
+                
+                // Store area if not already stored
+                if (!currentPolygon.areaSqM) {
+                    currentPolygon.areaSqM = areaSqM;
+                }
+                
+                // Store density
+                currentPolygon.density = density;
+                
+                // Make sure the polygon has a popup with the count, area and density
+                if (!currentPolygon.getPopup()) {
+                    currentPolygon.bindPopup(`
+                        <strong>Træer: ${count}</strong>
+                        <strong>Areal: ${formattedArea}</strong>
+                        <strong>Tæthed: ${density} trees/ha</strong>
+                    `, {
+                        className: 'tree-count-popup',
+                        closeButton: true,
+                        autoClose: false
+                    });
+                }
+            } else {
+                document.getElementById('treeCount').style.display = 'none';
+            }
+        }
+        
+        // Handle polygon creation
+        map.on('draw:created', function(e) {
+            const layer = e.layer;
+            drawnItems.addLayer(layer);
+
+            // Store the current polygon for tree counting
+            if (layer instanceof L.Polygon) {
+                // Remove previous polygon if exists
+                if (currentPolygon) {
+                    updateTreeCount();
+                }
+                currentPolygon = layer;
+
+                // Calculate tree count, area and density for this polygon
+                const { treeCount, treeCoverPercentage } = calculateTreeCount(layer);
+                const areaSqM = calculatePolygonArea(layer);
+                const formattedArea = formatArea(areaSqM);
+                const density = calculateTreeDensity(treeCount, areaSqM);
+
+                // Add a popup with tree count, area, density and tree cover to this polygon
+                layer.bindPopup(`
+                    <strong>Træer:</strong> <span class="popup-value">${treeCount}</span><br>
+                    <strong>Areal:</strong> <span class="popup-value">${formattedArea}</span><br>
+                    <strong>Densitet:</strong> <span class="popup-value">${density} træer/ha</span><br>
+                    <strong>Kronedække:</strong> <span class="popup-value">${treeCoverPercentage}%</span>
+                `, {
+                    className: 'tree-count-popup',
+                    closeButton: true,
+                    autoClose: false
+                });
+                layer.openPopup();
+
+                // Store the data with the polygon for later reference
+                layer.treeCount = treeCount;
+                layer.areaSqM = areaSqM;
+                layer.density = density;
+                layer.treeCoverPercentage = treeCoverPercentage;
+
+                // Update the display in the control panel as well
+                updateTreeCount();
+            }
+        });
+        
+        // Clear polygons button
+        document.getElementById('clearPolygons').addEventListener('click', function() {
+            // Close popups before clearing layers
+            drawnItems.eachLayer(function(layer) {
+                if (layer.getPopup() && layer.getPopup().isOpen()) {
+                    layer.closePopup();
+                }
+            });
+            
+            // Clear all drawn polygons
+            drawnItems.clearLayers();
+            currentPolygon = null;
+            document.getElementById('treeCount').style.display = 'none';
+        });
+        
+        // Draw polygon button
+        document.getElementById('drawPolygonBtn').addEventListener('click', function() {
+            // Trigger the polygon draw handler
+            new L.Draw.Polygon(map, drawControl.options.draw.polygon).enable();
+        });
+        
+        // Initialize toggle button state
+        let modelActive = false;
+        const toggleButton = document.getElementById('toggleModel');
+        
+        // Update tree count when model visibility changes
+        toggleButton.addEventListener('click', function() {
+            modelActive = !modelActive;
+            const statusElement = toggleButton.querySelector('.toggle-status');
+            
+            if (modelActive) {
+                toggleButton.classList.add('active');
+                statusElement.textContent = 'On';
+                statusElement.style.background = 'rgba(46, 204, 113, 0.2)';
+            } else {
+                toggleButton.classList.remove('active');
+                statusElement.textContent = 'Off';
+                statusElement.style.background = '#ffeeee';
+            }
+            
+            layer.redraw();
+        });
+        
+        // Handle polygon editing or deletion
+        map.on('draw:edited', function(e) {
+            const layers = e.layers;
+            layers.eachLayer(function(layer) {
+                if (layer instanceof L.Polygon) {
+                    // Recalculate tree count, area and cover
+                    const { treeCount, treeCoverPercentage } = calculateTreeCount(layer);
+                    const areaSqM = calculatePolygonArea(layer);
+                    const formattedArea = formatArea(areaSqM);
+                    const density = calculateTreeDensity(treeCount, areaSqM);
+                    
+                    // Update the popup content
+                    layer.setPopupContent(`
+                        <strong>Træer:</strong> <span class="popup-value">${treeCount}</span><br>
+                        <strong>Areal:</strong> <span class="popup-value">${formattedArea}</span><br>
+                        <strong>Tæthed:</strong> <span class="popup-value">${density} Træer/ha</span><br>
+                        <strong>Kronedække:</strong> <span class="popup-value">${treeCoverPercentage}%</span>
+                    `);
+                    
+                    // Store updated values
+                    layer.treeCount = treeCount;
+                    layer.areaSqM = areaSqM;
+                    layer.density = density;
+                    layer.treeCoverPercentage = treeCoverPercentage;
+                    
+                    // Update the control panel if this is the current polygon
+                    if (layer === currentPolygon) {
+                        updateTreeCount();
+                    }
+                }
+            });
+        });
+        
+        map.on('draw:deleted', function(e) {
+            const layers = e.layers;
+            layers.eachLayer(function(layer) {
+                if (layer === currentPolygon) {
+                    currentPolygon = null;
+                    document.getElementById('treeCount').style.display = 'none';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
