@@ -12,4 +12,4 @@ Spring orthophoto from [https://dataforsyningen.dk](https://dataforsyningen.dk/d
 
 ## Example image
 
-[](https://github.com/KennethTM/tree-browser/blob/main/example1.jpeg)
+![](https://github.com/KennethTM/tree-browser/blob/main/example1.jpeg)
