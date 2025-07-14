@@ -1,5 +1,7 @@
 # tree-browser
 
+## About
+
 Tree Crown Delineation and Tree Counting with Neural Networks — All Analyzed Locally in Your Browser
 
 [Link to web app](https://kennethtm.github.io/tree-browser/) (https://kennethtm.github.io/tree-browser/)
