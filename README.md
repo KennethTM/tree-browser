@@ -8,7 +8,7 @@ Model predicts tree-crown segmentation mask and tree density using a heatmap.
 
 Model trained using data from [https://github.com/sizhuoli/TreeCountSegHeight](https://github.com/sizhuoli/TreeCountSegHeight).
 
-Spring orthophoto from [https://dataforsyningen.dk](https://dataforsyningen.dk/data/981) (CC BY 4.0 license).
+Spring orthophoto from [https://dataforsyningen.dk](https://dataforsyningen.dk/data/981) (CC BY 4.0, GeoDanmark, Forårsbilleder Ortofoto).
 
 ## Example images
 
