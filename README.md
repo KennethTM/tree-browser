@@ -2,7 +2,7 @@
 
 Tree Crown Delineation and Tree Counting with Neural Networks — All Analyzed Locally in Your Browser
 
-[Link to web app](https://kennethtm.github.io/tree-browser/)
+[Link to web app (https://kennethtm.github.io/tree-browser/)](https://kennethtm.github.io/tree-browser/)
 
 Model predicts tree-crown segmentation mask and tree density using a heatmap.
 
